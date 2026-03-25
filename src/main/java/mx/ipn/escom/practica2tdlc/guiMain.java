@@ -715,8 +715,8 @@ if (automataActual == null) return;
     }//GEN-LAST:event_jButton4ActionPerformed
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton3ActionPerformed
-    javax.swing.table.DefaultTableModel modelo = (javax.swing.table.DefaultTableModel) tblTransicionesCrear.getModel();
-    modelo.addRow(new Object[]{"", "", ""});
+        javax.swing.table.DefaultTableModel modelo = (javax.swing.table.DefaultTableModel) tblTransicionesCrear.getModel();
+        modelo.addRow(new Object[]{"", "", ""});
     }//GEN-LAST:event_jButton3ActionPerformed
 
     /**
