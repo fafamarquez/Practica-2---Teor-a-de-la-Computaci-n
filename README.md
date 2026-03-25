@@ -38,6 +38,5 @@ A continuación se demuestra el funcionamiento del simulador validando los autó
  ┣ 📂 src/main/java            # Código fuente en Java (Simulador GUI y Lógica AutomataAFD)
  ┣ 📂 pom.xml                  # Configuración de dependencias de Maven
  ┣ 📂 JFLAP_Automatas          # Archivos de prueba y ejercicios
- ┃ ┣ 📂 Lista2_AFD             # Ejercicios resueltos en formato .jff y .xml
- ┃ ┗ 📂 Lista3_AFND            # Diseños de AFND y sus conversiones desde AFND-λ
+ ┣ 107.jff                     # Archivo .jff para verificar importación. Cadenas aceptadas: que contengan '021' y '0101'
  ┗ 📜 README.md                # Documentación del proyecto
