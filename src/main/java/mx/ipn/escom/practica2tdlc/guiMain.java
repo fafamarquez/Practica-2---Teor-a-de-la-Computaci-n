@@ -15,25 +15,27 @@ import java.util.Set;
  * @author rafael-marquez
  */
 public class guiMain extends javax.swing.JFrame {
-    private AutomataAFD automataActual = null;
+    private Automata automataActual = null;
     private int indicePaso = 0;
     private String cadenaPasoAPaso = "";
-    private String estadoActualSimulacion = "";
+    private Set<String> estadoActualSimulacion = new HashSet<>();
     private static final java.util.logging.Logger logger = java.util.logging.Logger.getLogger(guiMain.class.getName());
     private void actualizarTablaVista() {
-    // Cambia 'tblTransicionesVista' por el nombre real de tu tabla del Tab 2
-    javax.swing.table.DefaultTableModel modelo = (javax.swing.table.DefaultTableModel) tblTransicionesVista.getModel();
-    modelo.setRowCount(0); // Limpia la tabla por si había un autómata anterior
-
-    Map<String, Map<String, String>> trans = automataActual.getTransiciones();
-    for (String origen : trans.keySet()) {
-        Map<String, String> destinos = trans.get(origen);
-        for (String simbolo : destinos.keySet()) {
-            // Añade la fila: [Estado Origen, Símbolo, Estado Siguiente]
-            modelo.addRow(new Object[]{origen, simbolo, destinos.get(simbolo)});
+        if(automataActual != null) {
+            jScrollPane3.setViewportView(GraphViewer.createGraphComponent(automataActual, estadoActualSimulacion));
+        }
+        
+        if (automataActual != null) {
+            if (automataActual.determinarTipo() == Automata.Tipo.AFNL) {
+                lblTipoAutomata.setText("Tipo: AFN-λ");
+            } else if (automataActual.determinarTipo() == Automata.Tipo.AFND) {
+                lblTipoAutomata.setText("Tipo: AFND"); 
+            } else {
+                lblTipoAutomata.setText("Tipo: AFD"); 
+            }
         }
     }
-    }
+
     /**
      * Creates new form guiMain
      */
@@ -41,6 +43,121 @@ public class guiMain extends javax.swing.JFrame {
         initComponents();
         jTabbedPane1.setEnabledAt(0, false);
         jTabbedPane1.setEnabledAt(1, false);
+
+        jPanel8.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT, 10, 5));
+        jPanel8.removeAll();
+        jPanel8.add(jButton5);
+
+        javax.swing.JButton btnConvertirAFN = new javax.swing.JButton("Convertir a AFND");
+        btnConvertirAFN.addActionListener(e -> {
+            if(automataActual != null) {
+                StringBuilder log = new StringBuilder();
+                automataActual = OperacionesAutomata.afnlAfn(automataActual, log);
+                actualizarTablaVista();
+                txtConsolaTraza.setText("Autómata convertido a AFND (sin transiciones λ).\n");
+                txtConsolaTraza.append(log.toString());
+            }
+        });
+        jPanel8.add(btnConvertirAFN);
+
+        javax.swing.JButton btnConvertirAFD = new javax.swing.JButton("Convertir a AFD");
+        btnConvertirAFD.addActionListener(e -> {
+            if(automataActual != null) {
+                StringBuilder log = new StringBuilder();
+                automataActual = OperacionesAutomata.afnAfd(automataActual, log);
+                actualizarTablaVista();
+                txtConsolaTraza.setText("Autómata convertido a AFD (por subconjuntos).\n");
+                txtConsolaTraza.append(log.toString());
+            }
+        });
+        jPanel8.add(btnConvertirAFD);
+
+        javax.swing.JButton btnMinimizar = new javax.swing.JButton("Minimizar AFD");
+        btnMinimizar.addActionListener(e -> {
+            if(automataActual != null) {
+                try {
+                   Automata minimizado = OperacionesAutomata.minimizarAfd(automataActual);
+                   javax.swing.JFrame frameMin = new javax.swing.JFrame("Comparativa Minimización");
+                   frameMin.setSize(800, 400);
+                   frameMin.setLayout(new java.awt.GridLayout(1, 2));
+                   
+                   javax.swing.JPanel p1 = new javax.swing.JPanel(new java.awt.BorderLayout());
+                   p1.setBorder(javax.swing.BorderFactory.createTitledBorder("Original (" + automataActual.obtenerTodosLosEstados().size() + " estados)"));
+                   p1.add(GraphViewer.createGraphComponent(automataActual, null), java.awt.BorderLayout.CENTER);
+                   
+                   javax.swing.JPanel p2 = new javax.swing.JPanel(new java.awt.BorderLayout());
+                   p2.setBorder(javax.swing.BorderFactory.createTitledBorder("Minimizado (" + minimizado.obtenerTodosLosEstados().size() + " estados)"));
+                   p2.add(GraphViewer.createGraphComponent(minimizado, null), java.awt.BorderLayout.CENTER);
+                   
+                   frameMin.add(p1);
+                   frameMin.add(p2);
+                   frameMin.setVisible(true);
+
+                   automataActual = minimizado;
+                   actualizarTablaVista();
+                   txtConsolaTraza.setText("Autómata AFD minimizado exitosamente.\n");
+                } catch (Exception ex) {
+                   txtConsolaTraza.setText("Error en minimización: " + ex.getMessage());
+                }
+            }
+        });
+        jPanel8.add(btnMinimizar);
+        
+        javax.swing.JButton btnMultiple = new javax.swing.JButton("Pruebas por Lote");
+        btnMultiple.addActionListener(e -> {
+            if(automataActual != null) {
+                javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
+                int seleccion = fileChooser.showOpenDialog(this);
+                if (seleccion == javax.swing.JFileChooser.APPROVE_OPTION) {
+                     try {
+                         java.util.List<String> cadenas = java.nio.file.Files.readAllLines(fileChooser.getSelectedFile().toPath());
+                         txtConsolaTraza.setText("--- RESULTADOS PRUEBAS LOTE ---\n");
+                         for(String c : cadenas) {
+                              String res = automataActual.validarCadena(c);
+                              if(res.contains("CADENA ACEPTADA")) {
+                                  txtConsolaTraza.append("Cadena '" + c + "': ACEPTADA\n");
+                              } else {
+                                  txtConsolaTraza.append("Cadena '" + c + "': RECHAZADA\n");
+                              }
+                         }
+                     } catch (Exception ex) {
+                         txtConsolaTraza.setText("Error leyendo pruebas múltiples: " + ex.getMessage());
+                     }
+                }
+            }
+        });
+        jPanel8.add(btnMultiple);
+        javax.swing.JButton btnVerLambda = new javax.swing.JButton("Ver λ-Clausura");
+        btnVerLambda.addActionListener(e -> {
+            if(automataActual != null) {
+                String q = javax.swing.JOptionPane.showInputDialog(this, "Ingresa el estado:");
+                if(q != null && automataActual.obtenerTodosLosEstados().contains(q.trim())) {
+                    Set<String> clausura = automataActual.calcularClausuraLambda(new HashSet<>(java.util.Arrays.asList(q.trim())));
+                    txtConsolaTraza.setText("λ-Clausura (" + q.trim() + ") = " + clausura.toString() + "\n");
+                    jScrollPane3.setViewportView(GraphViewer.createGraphComponent(automataActual, clausura));
+                }
+            }
+        });
+        jPanel8.add(btnVerLambda);
+        
+        javax.swing.JButton btnExportar = new javax.swing.JButton("Exportar (JFF)");
+        btnExportar.addActionListener(e -> {
+            if(automataActual != null) {
+                javax.swing.JFileChooser fileChooser = new javax.swing.JFileChooser();
+                int seleccion = fileChooser.showSaveDialog(this);
+                if (seleccion == javax.swing.JFileChooser.APPROVE_OPTION) {
+                    try {
+                        String rute = fileChooser.getSelectedFile().getAbsolutePath();
+                        if(!rute.endsWith(".jff")) rute += ".jff";
+                        ExportadorJFLAP.exportar(automataActual, rute);
+                        txtConsolaTraza.setText("Exportado a:\n" + rute + "\n");
+                    } catch (Exception ex) {
+                        txtConsolaTraza.setText("Error al exportar: " + ex.getMessage());
+                    }
+                }
+            }
+        });
+        jPanel8.add(btnExportar);
     }
 
     /**
@@ -95,9 +212,7 @@ public class guiMain extends javax.swing.JFrame {
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("PRACTICA 2 TDLC");
-        setMaximumSize(new java.awt.Dimension(800, 500));
         setMinimumSize(new java.awt.Dimension(800, 500));
-        setResizable(false);
 
         jPanel1.setBackground(new java.awt.Color(255, 255, 255));
         jPanel1.setLayout(new java.awt.BorderLayout());
@@ -114,11 +229,12 @@ public class guiMain extends javax.swing.JFrame {
 
         txtAlfabeto.setText("{0,1}");
         txtAlfabeto.setEnabled(false);
+        txtAlfabeto.addActionListener(this::txtAlfabetoActionPerformed);
 
         jLabel3.setText("Estados (Q):");
         jLabel3.setEnabled(false);
 
-        txtEstados.setText("{q0,q1,q2}");
+        txtEstados.setText("{q0,q1,q2,q3}");
         txtEstados.setEnabled(false);
 
         jLabel4.setText("Estado inicial:");
@@ -131,10 +247,13 @@ public class guiMain extends javax.swing.JFrame {
 
         tblTransicionesCrear.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
-                {null, null, null},
-                {null, null, null},
-                {null, null, null},
-                {null, null, null}
+                {"q0", "λ", "q1"},
+                {"q1", "λ", "q2"},
+                {"q1", "1", "q3"},
+                {"q2", "0", "q1"},
+                {"q2", "1", "q2"},
+                {"q3", "λ", "q0"},
+                {"q3", "1", "q3"}
             },
             new String [] {
                 "Estado", "Símbolo", "Siguiente Estado"
@@ -158,7 +277,7 @@ public class guiMain extends javax.swing.JFrame {
             tblTransicionesCrear.getColumnModel().getColumn(2).setResizable(false);
         }
 
-        txtEstadosAceptacion.setText("{q0,q1,q2}");
+        txtEstadosAceptacion.setText("{q0}");
         txtEstadosAceptacion.setEnabled(false);
 
         txtEstadoInicial.setText("q0");
@@ -313,8 +432,6 @@ public class guiMain extends javax.swing.JFrame {
         jPanel6.setBackground(new java.awt.Color(255, 255, 255));
         jPanel6.setBorder(javax.swing.BorderFactory.createTitledBorder("Simulación"));
 
-        jScrollPane3.setHorizontalScrollBarPolicy(javax.swing.ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
-
         tblTransicionesVista.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
                 {null, null, null},
@@ -365,34 +482,33 @@ public class guiMain extends javax.swing.JFrame {
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
             .addGroup(jPanel6Layout.createSequentialGroup()
                 .addGap(23, 23, 23)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING, false)
-                    .addComponent(jLabel10, javax.swing.GroupLayout.DEFAULT_SIZE, 208, Short.MAX_VALUE)
-                    .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE))
-                .addGap(18, 18, 18)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.TRAILING)
-                    .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 547, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addGroup(javax.swing.GroupLayout.Alignment.LEADING, jPanel6Layout.createSequentialGroup()
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addComponent(jLabel10, javax.swing.GroupLayout.PREFERRED_SIZE, 208, javax.swing.GroupLayout.PREFERRED_SIZE)
+                        .addGap(18, 18, 18)
                         .addComponent(lblTipoAutomata, javax.swing.GroupLayout.PREFERRED_SIZE, 180, javax.swing.GroupLayout.PREFERRED_SIZE)
                         .addGap(102, 102, 102)
                         .addComponent(jLabel1, javax.swing.GroupLayout.PREFERRED_SIZE, 64, javax.swing.GroupLayout.PREFERRED_SIZE)
-                        .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
-                        .addComponent(lblEstadoActual, javax.swing.GroupLayout.PREFERRED_SIZE, 104, javax.swing.GroupLayout.PREFERRED_SIZE)))
-                .addContainerGap(7, Short.MAX_VALUE))
+                        .addGap(12, 12, 12)
+                        .addComponent(lblEstadoActual, javax.swing.GroupLayout.PREFERRED_SIZE, 104, javax.swing.GroupLayout.PREFERRED_SIZE))
+                    .addGroup(jPanel6Layout.createSequentialGroup()
+                        .addComponent(jScrollPane3, javax.swing.GroupLayout.DEFAULT_SIZE, 215, Short.MAX_VALUE)
+                        .addGap(18, 18, 18)
+                        .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 547, javax.swing.GroupLayout.PREFERRED_SIZE))))
         );
         jPanel6Layout.setVerticalGroup(
             jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGroup(javax.swing.GroupLayout.Alignment.TRAILING, jPanel6Layout.createSequentialGroup()
+            .addGroup(jPanel6Layout.createSequentialGroup()
                 .addGap(12, 12, 12)
-                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
                     .addComponent(jLabel10)
                     .addComponent(lblTipoAutomata)
                     .addComponent(jLabel1)
-                    .addComponent(lblEstadoActual, javax.swing.GroupLayout.DEFAULT_SIZE, javax.swing.GroupLayout.DEFAULT_SIZE, Short.MAX_VALUE))
-                .addPreferredGap(javax.swing.LayoutStyle.ComponentPlacement.UNRELATED)
+                    .addComponent(lblEstadoActual, javax.swing.GroupLayout.PREFERRED_SIZE, 18, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addGap(12, 12, 12)
                 .addGroup(jPanel6Layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-                    .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 281, javax.swing.GroupLayout.PREFERRED_SIZE)
-                    .addComponent(jScrollPane1, javax.swing.GroupLayout.PREFERRED_SIZE, 281, javax.swing.GroupLayout.PREFERRED_SIZE))
-                .addGap(14, 14, 14))
+                    .addComponent(jScrollPane3, javax.swing.GroupLayout.PREFERRED_SIZE, 0, Short.MAX_VALUE)
+                    .addComponent(jScrollPane1, javax.swing.GroupLayout.DEFAULT_SIZE, 295, Short.MAX_VALUE)))
         );
 
         jPanel5.add(jPanel6, java.awt.BorderLayout.CENTER);
@@ -494,7 +610,7 @@ public class guiMain extends javax.swing.JFrame {
             Set<String> estados = new HashSet<>(Arrays.asList(strEstados.split(",")));
             Set<String> estadosAceptacion = new HashSet<>(Arrays.asList(strEstadosAceptacion.split(",")));
 
-            Map<String, Map<String, String>> transiciones = new HashMap<>();
+            Map<String, Map<String, Set<String>>> transiciones = new HashMap<>();
             if (tblTransicionesCrear.isEditing()) {
             tblTransicionesCrear.getCellEditor().stopCellEditing();
             }
@@ -511,7 +627,7 @@ public class guiMain extends javax.swing.JFrame {
 
                 // === INICIO DE LA VALIDACIÓN ESTRICTA ===
                 // Si el símbolo de la tabla NO está en el conjunto del alfabeto que escribimos arriba
-                if (!alfabeto.contains(simbolo)) {
+                if (!alfabeto.contains(simbolo) && !simbolo.equals("λ") && !simbolo.equals("ε")) {
                     // Mostramos el error en tu etiqueta roja
                     lblMensajeError.setText("ERROR: El símbolo '" + simbolo + "' no está en el alfabeto Σ.");
                     lblMensajeError.setForeground(java.awt.Color.RED);
@@ -531,10 +647,11 @@ public class guiMain extends javax.swing.JFrame {
                 // === FIN DE LA VALIDACIÓN ===
 
                 transiciones.putIfAbsent(origen, new HashMap<>());
-                transiciones.get(origen).put(simbolo, destino);
+                transiciones.get(origen).putIfAbsent(simbolo, new HashSet<>());
+                transiciones.get(origen).get(simbolo).add(destino);
             }
 
-            automataActual = new AutomataAFD(alfabeto, estadoInicial, estadosAceptacion, transiciones);
+            automataActual = new Automata(alfabeto, estadoInicial, estadosAceptacion, transiciones);
             // ===================================================================
 
             lblMensajeError.setText("ÉXITO: Autómata manual creado. Pasando a simulación...");
@@ -553,13 +670,15 @@ public class guiMain extends javax.swing.JFrame {
         lblMensajeError.setForeground(java.awt.Color.RED);
     }
     if (automataActual != null) {
-        if (automataActual.getAlfabeto().contains("λ") || automataActual.getAlfabeto().contains("ε")) {
-            lblTipoAutomata.setText("Tipo: AFND-λ");
+        if (automataActual.determinarTipo() == Automata.Tipo.AFNL) {
+            lblTipoAutomata.setText("Tipo: AFN-λ");
+        } else if (automataActual.determinarTipo() == Automata.Tipo.AFND) {
+            lblTipoAutomata.setText("Tipo: AFND"); 
         } else {
             lblTipoAutomata.setText("Tipo: AFD"); 
         }
     } else {
-    lblTipoAutomata.setText("Tipo: AFD"); // Nuestro simulador garantiza comportamiento AFD
+        lblTipoAutomata.setText("Tipo: AFD"); // Default fallback
     }
     }//GEN-LAST:event_jButton2ActionPerformed
 
@@ -574,8 +693,7 @@ public class guiMain extends javax.swing.JFrame {
     lblResultadoValidacion.setText("");
     
     // Limpiar la tabla de solo lectura del Tab 2
-    javax.swing.table.DefaultTableModel modeloVista = (javax.swing.table.DefaultTableModel) tblTransicionesVista.getModel();
-    modeloVista.setRowCount(0);
+    jScrollPane3.setViewportView(tblTransicionesVista); // Volvemos a colocar la tabla vacía original si se desea
 
     // 5. Regresar al usuario al Tab 1
     jTabbedPane1.setSelectedIndex(0);
@@ -660,10 +778,16 @@ if (automataActual == null) return;
         txtIngresarCadena.setEnabled(false);
         btnValidarDeGolpe.setEnabled(false);
         cadenaPasoAPaso = txtIngresarCadena.getText().trim();
-        estadoActualSimulacion = automataActual.getEstadoInicial();
+        
+        Set<String> initSet = new HashSet<>();
+        initSet.add(automataActual.getEstadoInicial());
+        estadoActualSimulacion.clear();
+        estadoActualSimulacion.addAll(automataActual.calcularClausuraLambda(initSet));
+        
         txtConsolaTraza.setText("--- INICIO SIMULACIÓN PASO A PASO ---\n");
         txtConsolaTraza.append("Cadena: " + cadenaPasoAPaso + "\n");
-        lblEstadoActual.setText(estadoActualSimulacion); // Tu etiqueta "q1"
+        lblEstadoActual.setText(estadoActualSimulacion.toString()); // Tu etiqueta "q1"
+        actualizarTablaVista();
         lblResultadoValidacion.setText("EN PROCESO...");
         lblResultadoValidacion.setForeground(java.awt.Color.ORANGE);
         
@@ -676,19 +800,27 @@ if (automataActual == null) return;
     if (indicePaso < cadenaPasoAPaso.length()) {
         String simbolo = String.valueOf(cadenaPasoAPaso.charAt(indicePaso));
         
-        txtConsolaTraza.append("\nEvaluando símbolo: '" + simbolo + "' desde estado [" + estadoActualSimulacion + "]\n");
+        txtConsolaTraza.append("\nEvaluando símbolo: '" + simbolo + "' desde estados " + estadoActualSimulacion + "\n");
         
-        Map<String, String> transiciones = automataActual.getTransiciones().get(estadoActualSimulacion);
+        Set<String> siguientes = new HashSet<>();
+        for(String q : estadoActualSimulacion) {
+            Map<String, Set<String>> transiciones = automataActual.getTransiciones().get(q);
+            if (transiciones != null && transiciones.containsKey(simbolo)) {
+                siguientes.addAll(transiciones.get(simbolo));
+            }
+        }
         
-        if (transiciones != null && transiciones.containsKey(simbolo)) {
-            String nuevoEstado = transiciones.get(simbolo);
-            txtConsolaTraza.append("[" + estadoActualSimulacion + "] --(" + simbolo + ")--> [" + nuevoEstado + "]\n");
+        if (!siguientes.isEmpty()) {
+            Set<String> clLambda = automataActual.calcularClausuraLambda(siguientes);
+            txtConsolaTraza.append(estadoActualSimulacion + " --(" + simbolo + ")--> " + clLambda + "\n");
             
-            estadoActualSimulacion = nuevoEstado;
-            lblEstadoActual.setText(estadoActualSimulacion); // Actualiza la etiqueta visual
+            estadoActualSimulacion.clear();
+            estadoActualSimulacion.addAll(clLambda);
+            lblEstadoActual.setText(estadoActualSimulacion.toString()); // Actualiza la etiqueta visual
+            actualizarTablaVista();
             indicePaso++;
         } else {
-            txtConsolaTraza.append("ERROR: No hay transición para '" + simbolo + "'. El autómata se detiene.\n");
+            txtConsolaTraza.append("ERROR: No hay caminos válidos para '" + simbolo + "'. El autómata se detiene.\n");
             lblResultadoValidacion.setText("CADENA RECHAZADA");
             lblResultadoValidacion.setForeground(java.awt.Color.RED);
             indicePaso = 0; // Reiniciar
@@ -699,16 +831,24 @@ if (automataActual == null) return;
     // Si ya terminamos de leer toda la cadena
     else {
         txtConsolaTraza.append("\n--- FIN DE LA CADENA ---\n");
-        if (automataActual.getEstadosAceptacion().contains(estadoActualSimulacion)) {
-            txtConsolaTraza.append("El estado [" + estadoActualSimulacion + "] ES de aceptación.\n");
+        
+        boolean isAceptado = false;
+        for(String q : estadoActualSimulacion) {
+            if(automataActual.getEstadosAceptacion().contains(q)) isAceptado = true;
+        }
+
+        if (isAceptado) {
+            txtConsolaTraza.append("Al menos un estado en " + estadoActualSimulacion + " ES de aceptación.\n");
             lblResultadoValidacion.setText("CADENA ACEPTADA");
             lblResultadoValidacion.setForeground(new java.awt.Color(0, 153, 0));
         } else {
-            txtConsolaTraza.append("El estado [" + estadoActualSimulacion + "] NO es de aceptación.\n");
+            txtConsolaTraza.append("Ninguno de los estados en " + estadoActualSimulacion + " es de aceptación.\n");
             lblResultadoValidacion.setText("CADENA RECHAZADA");
             lblResultadoValidacion.setForeground(java.awt.Color.RED);
         }
         indicePaso = 0; // Reiniciar para la siguiente simulación
+        estadoActualSimulacion.clear();
+        actualizarTablaVista();
         txtIngresarCadena.setEnabled(true);
         btnValidarDeGolpe.setEnabled(true);
     }
@@ -718,6 +858,10 @@ if (automataActual == null) return;
         javax.swing.table.DefaultTableModel modelo = (javax.swing.table.DefaultTableModel) tblTransicionesCrear.getModel();
         modelo.addRow(new Object[]{"", "", ""});
     }//GEN-LAST:event_jButton3ActionPerformed
+
+    private void txtAlfabetoActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtAlfabetoActionPerformed
+        // TODO add your handling code here:
+    }//GEN-LAST:event_txtAlfabetoActionPerformed
 
     /**
      * @param args the command line arguments

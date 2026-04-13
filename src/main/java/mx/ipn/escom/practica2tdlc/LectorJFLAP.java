@@ -19,7 +19,7 @@ import java.util.*;
 
 public class LectorJFLAP {
 
-    public static AutomataAFD cargarDesdeXML(String rutaArchivo) throws Exception {
+    public static Automata cargarDesdeXML(String rutaArchivo) throws Exception {
         File archivo = new File(rutaArchivo);
         DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
         DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
@@ -30,7 +30,7 @@ public class LectorJFLAP {
         Set<String> estados = new HashSet<>();
         Set<String> estadosAceptacion = new HashSet<>();
         String estadoInicial = "";
-        Map<String, Map<String, String>> transiciones = new HashMap<>();
+        Map<String, Map<String, Set<String>>> transiciones = new HashMap<>();
 
         // 1. Leer Estados
         NodeList listaEstados = doc.getElementsByTagName("state");
@@ -38,7 +38,6 @@ public class LectorJFLAP {
             Node nodo = listaEstados.item(i);
             if (nodo.getNodeType() == Node.ELEMENT_NODE) {
                 Element elemento = (Element) nodo;
-                // === AQUÍ ESTÁ LA MAGIA: LE PEGAMOS LA "q" ===
                 String idEstado = "q" + elemento.getAttribute("id"); 
                 estados.add(idEstado);
 
@@ -57,18 +56,24 @@ public class LectorJFLAP {
             Node nodo = listaTransiciones.item(i);
             if (nodo.getNodeType() == Node.ELEMENT_NODE) {
                 Element elemento = (Element) nodo;
-                // === LE PEGAMOS LA "q" A ORIGEN Y DESTINO ===
                 String origen = "q" + elemento.getElementsByTagName("from").item(0).getTextContent();
                 String destino = "q" + elemento.getElementsByTagName("to").item(0).getTextContent();
-                String simbolo = elemento.getElementsByTagName("read").item(0).getTextContent();
+                
+                String simbolo = "";
+                if (elemento.getElementsByTagName("read").getLength() > 0 && elemento.getElementsByTagName("read").item(0).getTextContent() != null) {
+                    simbolo = elemento.getElementsByTagName("read").item(0).getTextContent();
+                }
 
-                if (simbolo == null || simbolo.isEmpty()) simbolo = "λ"; 
+                if (simbolo.isEmpty()) simbolo = "λ"; 
+                if (!simbolo.equals("λ") && !simbolo.equals("ε")) {
+                    alfabeto.add(simbolo);
+                }
 
-                alfabeto.add(simbolo);
                 transiciones.putIfAbsent(origen, new HashMap<>());
-                transiciones.get(origen).put(simbolo, destino);
+                transiciones.get(origen).putIfAbsent(simbolo, new HashSet<>());
+                transiciones.get(origen).get(simbolo).add(destino);
             }
         }
-        return new AutomataAFD(alfabeto, estadoInicial, estadosAceptacion, transiciones);
+        return new Automata(alfabeto, estadoInicial, estadosAceptacion, transiciones);
     }
 }
